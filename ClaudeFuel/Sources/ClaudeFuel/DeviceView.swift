@@ -302,6 +302,7 @@ final class DeviceView: NSView {
                 let seam2 = CGPath(roundedRect: body.insetBy(dx: 6.2, dy: 6.2), cornerWidth: radius-5, cornerHeight: radius-5, transform: nil)
                 ctx.addPath(seam2); ctx.setStrokeColor(NSColor.white.withAlphaComponent(0.06).cgColor); ctx.setLineWidth(1); ctx.strokePath()
             }
+            if theme.odradek && !compact { drawOdradekFacets(ctx, body) }
         }
 
         let sInset: CGFloat = compact ? 20 : 26
@@ -439,10 +440,44 @@ final class DeviceView: NSView {
         }
     }
 
+    // Faceted flanks (Ventura-style): angular beveled panels sculpted into the side margins beside
+    // the screen — a light top bevel + shadowed lower edge — plus a small orange 12-o'clock accent.
+    private func drawOdradekFacets(_ ctx: CGContext, _ body: CGRect) {
+        let light = NSColor.white.withAlphaComponent(0.11).cgColor
+        let shadow = NSColor.black.withAlphaComponent(0.6).cgColor
+        let panel = NSColor.black.withAlphaComponent(0.30).cgColor
+        let y0 = body.minY + body.height * 0.17, y1 = body.maxY - body.height * 0.17
+        let n = 3, gap = body.height * 0.02
+        let h = (y1 - y0 - gap * CGFloat(n - 1)) / CGFloat(n)
+        let slant = h * 0.26
+        for side in 0..<2 {
+            let outer = side == 0 ? body.minX + 4 : body.maxX - 4
+            let inner = side == 0 ? body.minX + 28 : body.maxX - 28
+            for i in 0..<n {
+                let ty = y0 + (h + gap) * CGFloat(i), by = ty + h
+                let p = CGMutablePath()
+                p.move(to: CGPoint(x: outer, y: ty + slant))
+                p.addLine(to: CGPoint(x: inner, y: ty))
+                p.addLine(to: CGPoint(x: inner, y: by))
+                p.addLine(to: CGPoint(x: outer, y: by - slant))
+                p.closeSubpath()
+                ctx.addPath(p); ctx.setFillColor(panel); ctx.fillPath()
+                ctx.setLineWidth(1.2); ctx.setLineCap(.round)
+                ctx.move(to: CGPoint(x: outer, y: ty + slant)); ctx.addLine(to: CGPoint(x: inner, y: ty))
+                ctx.setStrokeColor(light); ctx.strokePath()
+                ctx.move(to: CGPoint(x: inner, y: by)); ctx.addLine(to: CGPoint(x: outer, y: by - slant))
+                ctx.setStrokeColor(shadow); ctx.strokePath()
+            }
+        }
+        // orange 12-o'clock accent above the screen
+        ctx.setFillColor(hexC(0xE8763A))
+        ctx.fill(CGRect(x: body.midX - 2, y: body.minY + body.height * 0.055, width: 4, height: body.height * 0.02))
+    }
+
     // The Odradek scanner badge: an orange sensor "cross" (four flat blades around a lit core) over a
     // soft glow, flanked by hazard ticks — the black-and-orange kit clipped to Sam's shoulder.
     private func drawOdradek(_ ctx: CGContext, center c: CGPoint) {
-        let cyan = hexC(0x4FB6DE), cyanHi = hexC(0xBFE9FF), dark = hexC(0x060809)
+        let cyan = hexC(0xE8763A), cyanHi = hexC(0xF0A84B), dark = hexC(0x0A0806)
         if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
                 colors: [cyan.copy(alpha: 0.42)!, cyan.copy(alpha: 0)!] as CFArray, locations: [0, 1]) {
             ctx.drawRadialGradient(g, startCenter: c, startRadius: 0, endCenter: c, endRadius: 34, options: [])

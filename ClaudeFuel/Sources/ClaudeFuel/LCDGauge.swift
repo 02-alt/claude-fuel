@@ -836,25 +836,29 @@ func ringGauge(_ lcd: LCD, cx: Int, cy: Int, r: Int, frac: Double, ring: CGColor
     }
 }
 
-// A sparse holographic backdrop — small crosses, ×'s and dashes scattered across the panel (the DS
-// chiral-network field). Deterministic scatter; kept clear of the ring interior so the readout stays
-// clean. `color` carries its own alpha (the field is drawn at half opacity).
-func chiralField(_ lcd: LCD, cx: Int, cy: Int, clearR: Int, color c: CGColor) {
-    for i in 0..<22 {
-        let x = (i * 53 + 11) % (lcd.W - 10) + 5
-        let y = (i * 89 + 17) % (lcd.H - 10) + 5
-        if (x-cx)*(x-cx) + (y-cy)*(y-cy) < clearR*clearR { continue }
-        switch i % 4 {
-        case 0:  // plus +
-            lcd.px(x,y,c); lcd.px(x-1,y,c); lcd.px(x+1,y,c); lcd.px(x,y-1,c); lcd.px(x,y+1,c)
-        case 1:  // cross ×
-            lcd.px(x-1,y-1,c); lcd.px(x+1,y+1,c); lcd.px(x-1,y+1,c); lcd.px(x+1,y-1,c)
-        case 2:  // dash -
-            lcd.px(x-1,y,c); lcd.px(x,y,c); lcd.px(x+1,y,c)
-        default: // tiny square
-            lcd.px(x,y,c); lcd.px(x+1,y,c); lcd.px(x,y+1,c); lcd.px(x+1,y+1,c)
+// A sparse holographic frame — small crosses, ×'s and dashes tucked against the LCD border (the DS
+// chiral-network field), leaving the centre clear for the readout. `color` carries its own alpha.
+func chiralField(_ lcd: LCD, color c: CGColor) {
+    func mark(_ x: Int, _ y: Int, _ t: Int) {
+        switch t & 3 {
+        case 0:  lcd.px(x,y,c); lcd.px(x-1,y,c); lcd.px(x+1,y,c); lcd.px(x,y-1,c); lcd.px(x,y+1,c)   // +
+        case 1:  lcd.px(x-1,y-1,c); lcd.px(x+1,y+1,c); lcd.px(x-1,y+1,c); lcd.px(x+1,y-1,c)           // ×
+        case 2:  lcd.px(x-1,y,c); lcd.px(x,y,c); lcd.px(x+1,y,c)                                       // -
+        default: lcd.px(x,y,c); lcd.px(x+1,y,c); lcd.px(x,y+1,c); lcd.px(x+1,y+1,c)                    // square
         }
     }
+    let W = lcd.W, H = lcd.H
+    // left & right borders — a column of marks down each edge, gently staggered inward
+    var i = 0
+    for y in stride(from: 24, through: H - 18, by: 15) {
+        mark(6 + (i & 1) * 3, y, i)
+        mark(W - 7 - (i & 1) * 3, y, i + 2)
+        i += 1
+    }
+    // bottom border row
+    for x in stride(from: 18, to: W - 12, by: 18) { mark(x, H - 7, i); i += 1 }
+    // top corners only (the title lives along the top edge)
+    mark(9, 8, 1); mark(W - 10, 8, 2)
 }
 
 // Fake-3D depth on the ring: a faint tilted orbit path (an ellipse seen edge-on) plus a node that
@@ -885,8 +889,8 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // holographic backdrop: sparse crosses + dashes at half opacity, clear of the ring interior
-    chiralField(lcd, cx: 60, cy: 65, clearR: 46, color: opColor(0x5FB6DE, 0.5))
+    // holographic frame: sparse crosses + dashes tucked against the border at half opacity
+    chiralField(lcd, color: opColor(0x5FB6DE, 0.5))
 
     lcdTextSpacedC(lcd, "ODRADEK", 60, 4, white, gap: 3)
 

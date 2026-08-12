@@ -192,12 +192,13 @@ struct Theme {
     // Amber is the weekly accent; drains into a red "BT proximity" alert.
     static let odradek = Theme(
         id: "odradek", name: "Odradek",
-        // near-black graphite, minimal, with a cool cyan hologram glow — the DS Cuff-Links palette
-        metalHi: hex(0x24272C), metal: hex(0x131519), metalLo: hex(0x070809), edge: hex(0x2C5866),
-        screwHi: hex(0x3A4750), screwLo: hex(0x0C0F12),
-        brand: hex(0x8CA6B4),
+        // matte-black PVD case with silver bevel edges + an orange accent (Ventura-style), a cyan
+        // hologram screen and an orange scanner badge — the black/orange Odradek kit.
+        metalHi: hex(0x212227), metal: hex(0x131418), metalLo: hex(0x070708), edge: hex(0x4C4E56),
+        screwHi: hex(0x585B62), screwLo: hex(0x0C0D10),
+        brand: hex(0x9AA0A8),
         bezel: hex(0x080A0C), bezelInner: hex(0x000000),
-        btnHi: hex(0x1E2226), btnLo: hex(0x0E1114), btnGlyph: hex(0x9FC4D4),
+        btnHi: hex(0x1E2024), btnLo: hex(0x0E0F12), btnGlyph: hex(0xADB4BC),
         lcdBG: hex(0x080B0F), lcdOn: hex(0xF2F5F7),
         lcdGlow: hex(0x4FB6DE), lcdAccent: hex(0xF0A84B), emblem: .odradek, odradek: true
     )
