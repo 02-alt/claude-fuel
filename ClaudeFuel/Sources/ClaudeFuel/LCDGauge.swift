@@ -873,16 +873,15 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     }
 
     lcdTextSpacedC(lcd, "ODRADEK", 60, 4, white, gap: 3)
-    lcdLine(lcd, 6, 13, 113, 13, dim)
 
-    // session ring dial — the hero. Bigger circle so the stacked readout sits clear of the rim.
-    let cx = 60, cy = 72, r = 44
+    // session ring dial — the hero. Centred vertically between the title and the RECONNECT line.
+    let cx = 60, cy = 65, r = 44
     ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
     if !low { orbit3D(lcd, cx: cx, cy: cy, r: r, phase: phase, path: dim, node: cyanHi) }
     lcdChevron(lcd, cx - r - 5, cy, left: true,  cyan)
     lcdChevron(lcd, cx + r + 5, cy, left: false, cyan)
-    lcdTextSpacedC(lcd, "SESSION", cx, 46, cyan, gap: 1)
-    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 62, low ? danger : white, 3)
+    lcdTextSpacedC(lcd, "SESSION", cx, 39, cyan, gap: 1)
+    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 55, low ? danger : white, 3)
 
     // session reset — one clean line under the ring
     lcdText(lcd, low ? "TIMEFALL" : "RECONNECT", 8, 120, low ? danger : dim)
