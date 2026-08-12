@@ -836,6 +836,27 @@ func ringGauge(_ lcd: LCD, cx: Int, cy: Int, r: Int, frac: Double, ring: CGColor
     }
 }
 
+// A sparse holographic backdrop — small crosses, ×'s and dashes scattered across the panel (the DS
+// chiral-network field). Deterministic scatter; kept clear of the ring interior so the readout stays
+// clean. `color` carries its own alpha (the field is drawn at half opacity).
+func chiralField(_ lcd: LCD, cx: Int, cy: Int, clearR: Int, color c: CGColor) {
+    for i in 0..<22 {
+        let x = (i * 53 + 11) % (lcd.W - 10) + 5
+        let y = (i * 89 + 17) % (lcd.H - 10) + 5
+        if (x-cx)*(x-cx) + (y-cy)*(y-cy) < clearR*clearR { continue }
+        switch i % 4 {
+        case 0:  // plus +
+            lcd.px(x,y,c); lcd.px(x-1,y,c); lcd.px(x+1,y,c); lcd.px(x,y-1,c); lcd.px(x,y+1,c)
+        case 1:  // cross ×
+            lcd.px(x-1,y-1,c); lcd.px(x+1,y+1,c); lcd.px(x-1,y+1,c); lcd.px(x+1,y-1,c)
+        case 2:  // dash -
+            lcd.px(x-1,y,c); lcd.px(x,y,c); lcd.px(x+1,y,c)
+        default: // tiny square
+            lcd.px(x,y,c); lcd.px(x+1,y,c); lcd.px(x,y+1,c); lcd.px(x+1,y+1,c)
+        }
+    }
+}
+
 // Fake-3D depth on the ring: a faint tilted orbit path (an ellipse seen edge-on) plus a node that
 // circles it, scaling brighter/bigger in the front half — the DS chiral-globe gyroscope cue.
 func orbit3D(_ lcd: LCD, cx: Int, cy: Int, r: Int, phase: Double, path: CGColor, node: CGColor) {
@@ -864,13 +885,8 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // faint dotted backdrop fading downward — kept clear of the ring interior
-    for i in 0..<32 {
-        let x = (i * 67 + 13) % lcd.W, y = 18 + (i * 97 + 7) % 100
-        if (x-60)*(x-60) + (y-74)*(y-74) < 44*44 { continue }
-        let a = 0.15 * (1 - Double(y - 18) / 120)
-        if a > 0.03 { lcd.px(x, y, opColor(0x5FB6DE, CGFloat(a))) }
-    }
+    // holographic backdrop: sparse crosses + dashes at half opacity, clear of the ring interior
+    chiralField(lcd, cx: 60, cy: 65, clearR: 46, color: opColor(0x5FB6DE, 0.5))
 
     lcdTextSpacedC(lcd, "ODRADEK", 60, 4, white, gap: 3)
 
