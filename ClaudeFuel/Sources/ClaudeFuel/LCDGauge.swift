@@ -113,7 +113,7 @@ func opColor(_ v: Int, _ a: CGFloat = 1) -> CGColor {
 }
 
 func lcdGrid(_ lcd: LCD, _ theme: Theme) {
-    if theme.opStyle || theme.console != .none { return }   // OP-1 / console screens are emissive — no dot grid
+    if theme.opStyle || theme.console != .none || theme.odradek { return }   // OP-1 / console / Odradek screens are emissive — no dot grid
     let grid = theme.lcdOn.withAlphaComponent(0.09).cgColor
     var x = 0
     while x <= lcd.W { var y = 0; while y < lcd.H { lcd.px(x, y, grid); y += 5 }; x += 5 }
@@ -636,6 +636,268 @@ func drawGaugeScreenXbox(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: B
     lcdText(lcd, state.plan, bx0 + 4 + PF.width("PLAN ", 1), 158, barInk)
 }
 
+// A vertical BB-pod fuel cell: a rounded capsule whose amber fluid rises from the bottom to `f`,
+// topped by a bright chiral waterline and a couple of rising bubbles. `f == nil` blanks the fill
+// (the low-fuel blink). `phase` (seconds) animates the bubbles and the BB-core shimmer.
+func bbPod(_ lcd: LCD, x: Int, y: Int, w: Int, h: Int, f: Double?,
+           wall: CGColor, fill: CGColor, dim: CGColor, phase: Double) {
+    let cr = min(w, h) / 2                      // capsule radius = half width → fully rounded caps
+    func inset(_ row: Int) -> Int {             // horizontal inset of the rounded cap at this row
+        let edge = min(row, h - 1 - row)
+        if edge >= cr { return 0 }
+        let dy = Double(cr - 1 - edge)
+        return cr - Int((Double(cr * cr) - dy * dy).squareRoot().rounded())
+    }
+    // glass outline + caps
+    for row in 0..<h {
+        let ins = inset(row), gy = y + row
+        lcd.px(x + ins, gy, wall); lcd.px(x + w - 1 - ins, gy, wall)
+        if row == 0 || row == h - 1 { for xx in (x+ins)...(x+w-1-ins) { lcd.px(xx, gy, wall) } }
+    }
+    // BB core: a faint shimmering nucleus in the upper third
+    let coreY = y + h/3
+    let glow = 0.4 + 0.4 * (0.5 + 0.5 * sin(phase * 1.6))
+    lcd.px(x + w/2, coreY, dim); lcd.px(x + w/2 - 1, coreY, wall.copy(alpha: CGFloat(glow)) ?? wall)
+
+    guard let f else { return }
+    let ff = max(0, min(1, f))
+    let level = Int((Double(h - 4) * ff).rounded())     // fluid height inside the walls
+    for k in 0..<level {
+        let row = h - 2 - k, ins = inset(row), gy = y + row
+        let lo = x + ins + 1, hi = x + w - 2 - ins
+        if lo <= hi { for xx in lo...hi { lcd.px(xx, gy, fill) } }
+    }
+    if level > 0 {                                       // bright chiral waterline (meniscus)
+        let row = h - 1 - level, ins = inset(max(0, row))
+        let lo = x + ins + 1, hi = x + w - 2 - ins
+        if lo <= hi { for xx in lo...hi { lcd.px(xx, y + max(0, row), wall) } }
+    }
+    if level > 6 {                                       // rising bubbles
+        let span = Double(level - 2)
+        for i in 0..<2 {
+            let bx = x + w/2 + (i == 0 ? -3 : 4)
+            let up = (phase * (7 + Double(i) * 3) + Double(i) * 11).truncatingRemainder(dividingBy: span)
+            lcd.px(bx, y + h - 2 - Int(up), dim)
+        }
+    }
+}
+
+// MARK: - Screen: Odradek power-on (common) — an Odradek scanner unfolds. A chiral core fades in,
+// three sensor wings open and rotate, an expanding scan ring sweeps out, then it resolves to black
+// (the caller fades the UI up). Plays odradek_boot.m4a; skipped under Reduce Motion.
+func drawOdradekBoot(_ lcd: LCD, theme: Theme, elapsed e: Double, duration D: Double) {
+    let cx = 60.0, cy = 82.0
+    let cyan = opColor(0x4FB6DE), cyanHi = opColor(0xBFE9FF), ink = theme.lcdOn.cgColor
+    let t = max(0, min(1, e / D))
+    func smooth(_ a: Double, _ b: Double, _ x: Double) -> Double {
+        if x <= a { return 0 }; if x >= b { return 1 }
+        let u = (x - a) / (b - a); return u * u * (3 - 2 * u)
+    }
+    let fadeOut = 1 - smooth(0.85, 1.0, t)
+
+    let coreI = smooth(0.0, 0.3, t) * fadeOut
+    if coreI > 0.02 {
+        let pulse = 0.6 + 0.4 * sin(e * 8)
+        lcd.px(Int(cx), Int(cy), cyanHi.copy(alpha: CGFloat(coreI)) ?? cyanHi)
+        for (dx, dy) in [(-1,0),(1,0),(0,-1),(0,1)] {
+            lcd.px(Int(cx)+dx, Int(cy)+dy, cyanHi.copy(alpha: CGFloat(coreI * pulse * 0.7)) ?? cyanHi)
+        }
+    }
+    let wingI = smooth(0.22, 0.6, t) * (1 - smooth(0.65, 0.92, t)) * fadeOut
+    if wingI > 0.02 {
+        let len = 8.0 + 22.0 * smooth(0.22, 0.6, t)
+        for k in 0..<3 {
+            let a = e * 1.4 + Double(k) * 2.094
+            let ex = cx + cos(a) * len, ey = cy + sin(a) * len
+            lcdLine(lcd, Int(cx), Int(cy), Int(ex.rounded()), Int(ey.rounded()),
+                    cyan.copy(alpha: CGFloat(wingI)) ?? cyan)
+            lcd.px(Int(ex.rounded()), Int(ey.rounded()), cyanHi.copy(alpha: CGFloat(wingI)) ?? cyanHi)
+        }
+    }
+    let ringP = smooth(0.5, 1.0, t)
+    if ringP > 0.02 && ringP < 0.999 {
+        let r = 6.0 + ringP * 52.0, ringI = (1 - ringP) * fadeOut
+        var d = 0.0
+        while d < 360 { let a = d * .pi / 180
+            lcd.px(Int((cx + cos(a) * r).rounded()), Int((cy + sin(a) * r).rounded()),
+                   cyanHi.copy(alpha: CGFloat(ringI * 0.8)) ?? cyanHi)
+            d += 12
+        }
+    }
+    let txtI = smooth(0.35, 0.6, t) * (1 - smooth(0.8, 0.95, t)) * fadeOut
+    if txtI > 0.05 { lcdTextC(lcd, "CHIRAL LINK", 60, 120, ink.copy(alpha: CGFloat(txtI)) ?? ink) }
+}
+
+// MARK: - Screen: Odradek power-on (rare, ~1/15) — the DS "Seam" repatriation. Sam's soul rises
+// through dark water: caustics drift, bubbles stream up and pop at a rippling surface, and a bright
+// mote climbs to breach into light — then it resolves to black (the caller fades the UI up).
+func drawSeamBoot(_ lcd: LCD, theme: Theme, elapsed e: Double, duration D: Double) {
+    let white = theme.lcdOn.cgColor
+    let W = lcd.W, H = lcd.H
+    let t = max(0, min(1, e / D))
+    func smooth(_ a: Double, _ b: Double, _ x: Double) -> Double {
+        if x <= a { return 0 }; if x >= b { return 1 }
+        let u = (x - a) / (b - a); return u * u * (3 - 2 * u)
+    }
+    let fade = 1 - smooth(0.86, 1.0, t)                    // resolve to black at the tail
+    let surfaceY = Int(Double(H) * 0.15)                  // the water surface, near the top
+
+    // drifting caustics — a few faint horizontal wavy lines suggesting deep water
+    for k in 0..<4 {
+        let baseY = surfaceY + 24 + k * 34
+        let a = 0.07 * fade
+        for x in stride(from: 0, to: W, by: 2) {
+            let y = baseY + Int(3 * sin(Double(x) * 0.13 + e * 1.1 + Double(k)))
+            lcd.px(x, y, opColor(0x2A5A72, CGFloat(a)))
+        }
+    }
+
+    // rippling surface, growing brighter as we rise toward it
+    let surfaceI = smooth(0.12, 0.8, t) * fade
+    if surfaceI > 0.03 {
+        for x in 0..<W {
+            let y = surfaceY + Int(2.0 * sin(Double(x) * 0.22 + e * 3))
+            lcd.px(x, y, opColor(0xBFE9FF, CGFloat(surfaceI)))
+            lcd.px(x, y - 1, opColor(0x5FB6DE, CGFloat(surfaceI * 0.45)))
+        }
+    }
+
+    // rising bubbles — wobble upward, pop at the surface
+    for i in 0..<24 {
+        let seed = Double(i) * 12.9898
+        let speed = 24.0 + Double((i * 53) % 44)
+        let x0 = Double((i * 37 + 11) % W)
+        let ph0 = Double((i * 71) % 100) / 100.0
+        let travel = (e * speed / Double(H) + ph0).truncatingRemainder(dividingBy: 1.0)
+        let y = Double(H) - travel * Double(H - surfaceY)
+        if y < Double(surfaceY) { continue }
+        let x = Int((x0 + 4.0 * sin(y * 0.08 + seed)).rounded())
+        let a = (0.4 + 0.4 * abs(sin(seed))) * fade
+        lcd.px(x, Int(y), opColor(0xBFE9FF, CGFloat(a)))
+        if i % 3 == 0 { lcd.px(x + 1, Int(y), opColor(0xBFE9FF, CGFloat(a * 0.7))) }
+    }
+
+    // the soul mote — climbs from the deep to the surface
+    let rise = smooth(0.08, 0.82, t)
+    let my = Double(H) - rise * Double(H - surfaceY)
+    let mx = Double(W) / 2 + 5 * sin(e * 1.4)
+    for dx in -2...2 { for dy in -2...2 where dx*dx + dy*dy <= 4 {
+        lcd.px(Int(mx) + dx, Int(my) + dy, opColor(0xBFE9FF, CGFloat(fade)))
+    } }
+    for (dx, dy) in [(-3,0),(3,0),(0,-3),(0,3)] { lcd.px(Int(mx)+dx, Int(my)+dy, opColor(0x5FB6DE, CGFloat(0.5 * fade))) }
+
+    // breach — an expanding ring of light where the mote meets the surface
+    let breach = smooth(0.76, 0.9, t) * (1 - smooth(0.9, 1.0, t))
+    if breach > 0.02 {
+        let br = 4.0 + breach * 44.0
+        var a = 0.0
+        while a < 360 { let rad = a * .pi/180
+            lcd.px(Int(mx + cos(rad)*br), surfaceY + Int(sin(rad)*br*0.6), opColor(0xBFE9FF, CGFloat(breach)))
+            a += 9
+        }
+    }
+
+    let txtI = smooth(0.5, 0.72, t) * (1 - smooth(0.82, 0.95, t)) * fade
+    if txtI > 0.05 { lcdTextC(lcd, "REPATRIATION", 60, H - 22, white.copy(alpha: CGFloat(txtI)) ?? white) }
+}
+
+// Wide-tracked centred label (DS sets its type with generous letter-spacing).
+func lcdTextSpacedC(_ lcd: LCD, _ s: String, _ cx: Int, _ y: Int, _ c: CGColor, gap: Int = 2) {
+    let n = s.count
+    let total = n * 6 + max(0, n - 1) * gap
+    var x = cx - total / 2
+    for ch in s { lcdText(lcd, String(ch), x, y, c); x += 6 + gap }
+}
+
+// A small navigation chevron (‹ / ›), apex at (x, cy) — the DS D-pad cue around item rings.
+func lcdChevron(_ lcd: LCD, _ x: Int, _ cy: Int, left: Bool, _ c: CGColor) {
+    let d = left ? 1 : -1
+    for k in 0..<3 { lcd.px(x + d*k, cy - k, c); lcd.px(x + d*k, cy + k, c) }
+}
+
+// A thin wireframe ring dial: a dotted rim, tick marks (long at the quarters), and a bright arc
+// filling clockwise from 12 o'clock to `frac`. The DS "SND globe / item HUD" motif.
+func ringGauge(_ lcd: LCD, cx: Int, cy: Int, r: Int, frac: Double, ring: CGColor, fill: CGColor, dim: CGColor) {
+    let f = max(0, min(1, frac)), R = Double(r)
+    var d = 0.0
+    while d < 360 { let a = d * .pi/180
+        lcd.px(cx + Int((cos(a)*R).rounded()), cy + Int((sin(a)*R).rounded()), dim); d += 8 }
+    for deg in stride(from: 0.0, to: 360.0, by: 30.0) {
+        let a = deg * .pi/180, long = deg.truncatingRemainder(dividingBy: 90) == 0
+        let r0 = R - (long ? 5 : 3)
+        lcdLine(lcd, cx + Int((cos(a)*r0).rounded()), cy + Int((sin(a)*r0).rounded()),
+                     cx + Int((cos(a)*R).rounded()),  cy + Int((sin(a)*R).rounded()), ring)
+    }
+    var dd = 0.0
+    while dd <= f * 360 { let a = (-90 + dd) * .pi/180
+        lcd.px(cx + Int((cos(a)*R).rounded()),     cy + Int((sin(a)*R).rounded()), fill)
+        lcd.px(cx + Int((cos(a)*(R-1)).rounded()), cy + Int((sin(a)*(R-1)).rounded()), fill)
+        dd += 3
+    }
+}
+
+// Fake-3D depth on the ring: a faint tilted orbit path (an ellipse seen edge-on) plus a node that
+// circles it, scaling brighter/bigger in the front half — the DS chiral-globe gyroscope cue.
+func orbit3D(_ lcd: LCD, cx: Int, cy: Int, r: Int, phase: Double, path: CGColor, node: CGColor) {
+    let R = Double(r), tilt = 0.30
+    var a = 0.0
+    while a < 360 { let rad = a * .pi/180
+        lcd.px(cx + Int((cos(rad)*R).rounded()), cy + Int((sin(rad)*R*tilt).rounded()), path); a += 18
+    }
+    let ang = phase * 1.0
+    let nx = cx + Int((cos(ang)*R).rounded()), ny = cy + Int((sin(ang)*R*tilt).rounded())
+    let front = sin(ang) > 0                              // bottom half reads as nearer
+    lcd.px(nx, ny, node)
+    if front { for (dx,dy) in [(1,0),(-1,0),(0,1),(0,-1)] { lcd.px(nx+dx, ny+dy, node) } }
+}
+
+// MARK: - Screen: Death Stranding "ODRADEK" — the holographic Cuff-Links language: a thin cyan
+// wireframe ring dial for the session (tick marks + chevrons), wide-tracked labels, hairline info
+// rules, and a dotted backdrop. Amber is the cargo-only accent. Drains into a red "BT" alert.
+func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: Bool, phase: Double) {
+    let white = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor
+    let cyan = opColor(0x5FB6DE)                  // holographic structure / labels
+    let cyanHi = opColor(0xBFE9FF)               // bright chiral highlight
+    let amber = theme.lcdAccent.cgColor          // cargo accent only
+    let danger = opColor(0xE5484D)
+    let sf = max(0, min(1, state.fraction))
+    let low = state.low
+    let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
+
+    // faint dotted backdrop fading downward — kept clear of the ring interior
+    for i in 0..<32 {
+        let x = (i * 67 + 13) % lcd.W, y = 18 + (i * 97 + 7) % 100
+        if (x-60)*(x-60) + (y-74)*(y-74) < 44*44 { continue }
+        let a = 0.15 * (1 - Double(y - 18) / 120)
+        if a > 0.03 { lcd.px(x, y, opColor(0x5FB6DE, CGFloat(a))) }
+    }
+
+    lcdTextSpacedC(lcd, "ODRADEK", 60, 4, white, gap: 3)
+    lcdLine(lcd, 6, 13, 113, 13, dim)
+
+    // session ring dial — the hero. Bigger circle so the stacked readout sits clear of the rim.
+    let cx = 60, cy = 72, r = 44
+    ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
+    if !low { orbit3D(lcd, cx: cx, cy: cy, r: r, phase: phase, path: dim, node: cyanHi) }
+    lcdChevron(lcd, cx - r - 5, cy, left: true,  cyan)
+    lcdChevron(lcd, cx + r + 5, cy, left: false, cyan)
+    lcdTextSpacedC(lcd, "SESSION", cx, 46, cyan, gap: 1)
+    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 62, low ? danger : white, 3)
+
+    // session reset — one clean line under the ring
+    lcdText(lcd, low ? "TIMEFALL" : "RECONNECT", 8, 120, low ? danger : dim)
+    lcdTextR(lcd, state.resetSeconds.map { fmtClock($0) } ?? "READY", 112, 120, low ? danger : white)
+    lcdLine(lcd, 6, 132, 113, 132, dim)
+
+    // weekly + status — compact text, no bar
+    lcdText(lcd, "WEEKLY", 8, 138, amber)
+    lcdTextR(lcd, state.weekFraction.map { "\(Int(($0*100).rounded()))%" } ?? "--", 112, 138, amber)
+    lcdText(lcd, state.weekResetSeconds.map { fmtLong($0) } ?? "--", 8, 150, dim)
+    lcdTextR(lcd, state.live ? "LIVE" : "EST", 112, 150, cyan)
+    lcdText(lcd, "PLAN", 8, 162, dim)
+    lcdText(lcd, state.plan, 8 + PF.width("PLAN ", 1), 162, white)
+}
+
 // MARK: - Screen: large-print gauge (tap the LCD to toggle) — one big focus + huge digits
 func drawGaugeLargeScreen(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: Bool) {
     let on = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor, acc = theme.lcdAccent.cgColor
@@ -675,6 +937,58 @@ func drawGaugeLargeScreen(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: 
     if let wf = state.weekFraction {
         let wr = state.weekResetSeconds.map { fmtLong($0) } ?? ""
         lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 132, acc)
+    } else {
+        lcdTextC(lcd, "PLAN \(state.plan)", 60, 132, dim)
+    }
+    lcdTextC(lcd, "TAP TO EXIT", 60, 155, dim)
+}
+
+// MARK: - Screen: large-print ODRADEK — the Death Stranding large layout (huge session %, a thick
+// amber fuel bar, the chiral-network chip, and the reconnect countdown). `phase` drives the sparks.
+func drawGaugeLargeOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: Bool, phase: Double) {
+    let on = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor, amber = theme.lcdAccent.cgColor
+    let chiral = opColor(0xBFE9FF), danger = opColor(0xE5484D)
+    let sf = max(0, min(1, state.fraction))
+    let low = state.low
+    let fuel = low ? danger : amber
+
+    // a few chiral sparks drifting up
+    let span = Double(lcd.H)
+    for i in 0..<8 {
+        let sx = 8 + (i * 79) % (lcd.W - 16)
+        let up = (phase * (8 + Double(i)) + Double(i) * 41).truncatingRemainder(dividingBy: span)
+        lcd.px(sx, lcd.H - 1 - Int(up), opColor(0xBFE9FF, 0.28))
+    }
+
+    lcdTextC(lcd, "SESSION", 60, 6, dim)
+    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", 60, 16, fuel, 4)      // huge session %, 16…44
+
+    // thick fuel bar
+    let bx = 12, by = 54, bw = 96, bh = 18, segs = 12
+    for x in bx...(bx+bw) { lcd.px(x, by, chiral); lcd.px(x, by+bh, chiral) }
+    for y in by...(by+bh) { lcd.px(bx, y, chiral); lcd.px(bx+bw, y, chiral) }
+    if !(low && !blinkOn) {
+        let lit = Int((sf * Double(segs)).rounded())
+        let innerL = bx + 2, innerR = bx + bw - 1
+        let cell = Double(innerR - innerL) / Double(segs)
+        for i in 0..<segs where i < lit {
+            let x0 = innerL + Int((Double(i)   * cell).rounded())
+            let x1 = innerL + Int((Double(i+1) * cell).rounded())
+            lcd.rectFill(x0, by+2, max(1, x1 - x0 - 2), bh-3, fuel)
+        }
+    }
+
+    lcdTextC(lcd, low ? "SIGNAL LOST" : "CONNECTED", 60, 76, low ? danger : chiral)
+
+    let atClock = Store.shared.refillClockTime
+    lcdTextC(lcd, low ? "TIMEFALL" : (atClock ? "RECONNECT AT" : "RECONNECT IN"), 60, 91, dim)
+    let refillVal = state.resetSeconds.map { atClock ? fmtClockTime($0) : fmtClock($0) } ?? "READY"
+    lcdTextC(lcd, refillVal, 60, 103, on, 2)  // 103…117
+
+    lcdLine(lcd, 10, 126, 109, 126, dim)
+    if let wf = state.weekFraction {
+        let wr = state.weekResetSeconds.map { fmtLong($0) } ?? ""
+        lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 132, amber)
     } else {
         lcdTextC(lcd, "PLAN \(state.plan)", 60, 132, dim)
     }

@@ -39,7 +39,7 @@ func renderPreview(_ args: [String]) {
     default: break
     }
     if let p = val("--press"), let i = Int(p) { dev.previewPress(i, Double(val("--flash") ?? "1").map { CGFloat($0) } ?? 1) }
-    if let b = val("--boot"), let e = Double(b) { dev.previewBoot(e) }
+    if let b = val("--boot"), let e = Double(b) { dev.previewBoot(e, seam: args.contains("--seam")) }
 
     let size = compact ? NSSize(width: 560, height: 800) : NSSize(width: 640, height: 1000)
     let img = dev.snapshot(size: size)

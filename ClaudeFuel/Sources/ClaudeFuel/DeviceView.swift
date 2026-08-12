@@ -60,8 +60,9 @@ final class DeviceView: NSView {
     private var anim: Timer?
 
     private var bootStart: CFTimeInterval = 0            // console power-on anim start (0 = idle)
+    private var bootSeam = false                         // Odradek: this boot rolled the rare Seam intro
     // Each console's boot matches its startup clip: ps2_startup (9.0s) vs the trimmed xbox_startup (7.3s).
-    private var bootDuration: CFTimeInterval { theme.console == .xbox ? 7.3 : 9.0 }
+    private var bootDuration: CFTimeInterval { theme.console == .xbox ? 7.3 : theme.odradek ? 3.9 : 9.0 }
     private let bootFadeIn: CFTimeInterval = 1.2      // after the boot resolves to black, fade the LCD UI up
     private var bootTotal: CFTimeInterval { bootDuration + bootFadeIn }
     private var bootActive: Bool { bootStart > 0 }
@@ -97,14 +98,17 @@ final class DeviceView: NSView {
     // `force` = the user explicitly asked for it (applied a console theme, tapped the emblem) — always
     // replay. Without force it's the automatic first-open trigger, which plays at most once per launch.
     func startBoot(force: Bool = false) {
-        guard theme.console != .none, !reduceMotion, !theme.a11y else { return }
+        guard theme.console != .none || theme.odradek, !reduceMotion, !theme.a11y else { return }
         // No usable Claude login → the .gauge screen shows the sign-in panel, not the console boot
         // (see draw()). Don't fire the startup chime behind it — the boot plays once they're signed in.
         if needsSignIn { return }
         if !force && bootPlayedThisLaunch { return }
         bootPlayedThisLaunch = true
         bootStart = CACurrentMediaTime()
-        SFX.play(theme.console == .xbox ? "xbox_startup" : "ps2_startup")
+        // Odradek: 1-in-15 boots play the rare silent "Seam" repatriation; the rest are the scanner.
+        bootSeam = theme.odradek && Int.random(in: 0..<15) == 0
+        if theme.odradek { SFX.play(bootSeam ? "seam_boot" : "odradek_boot", volume: bootSeam ? 0.14 : 0.2) }
+        else if theme.console != .none { SFX.play(theme.console == .xbox ? "xbox_startup" : "ps2_startup") }
         screen = .gauge
         needsDisplay = true
     }
@@ -113,13 +117,13 @@ final class DeviceView: NSView {
     private func skipBoot() {
         guard bootActive else { return }
         bootStart = 0
-        SFX.stop(theme.console == .xbox ? "xbox_startup" : "ps2_startup")
+        SFX.stop(theme.odradek ? (bootSeam ? "seam_boot" : "odradek_boot") : theme.console == .xbox ? "xbox_startup" : "ps2_startup")
         screen = .gauge
         needsDisplay = true
     }
     func previewScreen(_ s: Screen, sel: Int = 0, page: Int = 0) { screen = s; settingsSel = sel; statsPage = page; settingsPage = page }
     var forceSignIn = false   // headless preview of the "not signed in" panel
-    func previewBoot(_ elapsed: Double) { screen = .gauge; bootStart = CACurrentMediaTime() - elapsed }  // headless boot-frame preview
+    func previewBoot(_ elapsed: Double, seam: Bool = false) { bootSeam = seam; screen = .gauge; bootStart = CACurrentMediaTime() - elapsed }  // headless boot-frame preview
     func previewPress(_ i: Int, _ v: CGFloat = 1) { if btnFlash.indices.contains(i) { btnFlash[i] = v } }
 
     // The mini player floats in a borderless window with nowhere to put a title-bar close
@@ -210,7 +214,7 @@ final class DeviceView: NSView {
         }
         // console themes have a living background (PS2 sway, Xbox nebula) — repaint the gauge
         // screen at ~15 fps while it's showing. Skipped under Reduce Motion / accessibility.
-        if theme.console != .none, !reduceMotion, !theme.a11y,
+        if (theme.console != .none || theme.odradek), !reduceMotion, !theme.a11y,
            compact || screen == .gauge, !Store.shared.largePrint {
             animFrame &+= 1
             if animFrame % 2 == 0 { needs = true }
@@ -350,11 +354,12 @@ final class DeviceView: NSView {
             }
             var s = state; s.fraction = displayFraction
             let phase = (reduceMotion || theme.a11y) ? 0 : Date().timeIntervalSinceReferenceDate
-            if theme.console != .none, bootActive {
+            if theme.console != .none || theme.odradek, bootActive {
                 let e = CACurrentMediaTime() - bootStart
-                // Resolve to the console's own gauge screen (PS2 Browser / Xbox blades).
+                // Resolve to the theme's own gauge screen (PS2 Browser / Xbox blades / Odradek).
                 func drawResolved() {
-                    if theme.console == .xbox { drawGaugeScreenXbox(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
+                    if theme.odradek { drawGaugeScreenOdradek(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
+                    else if theme.console == .xbox { drawGaugeScreenXbox(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
                     else { drawGaugeScreenPS2(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
                 }
                 if e >= bootTotal { bootStart = 0; drawResolved() }
@@ -370,14 +375,17 @@ final class DeviceView: NSView {
                     }
                 } else {
                     // Pure boot animation over black — no UI underneath — ending on black at bootDuration.
-                    if theme.console == .xbox { drawXboxBoot(lcd, theme: theme, elapsed: e, duration: bootDuration) }
+                    if theme.odradek { (bootSeam ? drawSeamBoot : drawOdradekBoot)(lcd, theme, e, bootDuration) }
+                    else if theme.console == .xbox { drawXboxBoot(lcd, theme: theme, elapsed: e, duration: bootDuration) }
                     else { drawPS2Boot(lcd, theme: theme, elapsed: e, duration: bootDuration) }
                 }
             }
+            else if Store.shared.largePrint, theme.odradek { drawGaugeLargeOdradek(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
             else if Store.shared.largePrint { drawGaugeLargeScreen(lcd, state: s, theme: theme, blinkOn: blinkOn) }
             else if theme.console == .ps2 { drawGaugeScreenPS2(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
             else if theme.console == .xbox { drawGaugeScreenXbox(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
             else if theme.opStyle { drawGaugeScreenOP1(lcd, state: s, theme: theme, blinkOn: blinkOn) }
+            else if theme.odradek { drawGaugeScreenOdradek(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
             else { drawGaugeScreen(lcd, state: s, theme: theme, blinkOn: blinkOn) }
         case .stats:
             drawStatsScreen(lcd, statsData(), theme: theme, page: statsPage)
@@ -426,7 +434,44 @@ final class DeviceView: NSView {
         case .op1:   drawOP1Knobs(ctx, center: center)
         case .powerRing: drawPowerRing(ctx, center: center, r: 12)
         case .pager: drawPagerBadge(ctx, center: center)
+        case .odradek: drawOdradek(ctx, center: center)
         }
+    }
+
+    // The Odradek scanner badge: an orange sensor "cross" (four flat blades around a lit core) over a
+    // soft glow, flanked by hazard ticks — the black-and-orange kit clipped to Sam's shoulder.
+    private func drawOdradek(_ ctx: CGContext, center c: CGPoint) {
+        let cyan = hexC(0x4FB6DE), cyanHi = hexC(0xBFE9FF), dark = hexC(0x060809)
+        if let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: [cyan.copy(alpha: 0.42)!, cyan.copy(alpha: 0)!] as CFArray, locations: [0, 1]) {
+            ctx.drawRadialGradient(g, startCenter: c, startRadius: 0, endCenter: c, endRadius: 34, options: [])
+        }
+        // hazard ticks flanking the scanner (utility-kit markings)
+        ctx.setStrokeColor(cyan.copy(alpha: 0.65)!); ctx.setLineWidth(2); ctx.setLineCap(.round)
+        for s in [-1.0, 1.0] as [CGFloat] {
+            for k in 0..<3 {
+                let x = c.x + s * (30 + CGFloat(k) * 7)
+                ctx.move(to: CGPoint(x: x - 3, y: c.y - 6)); ctx.addLine(to: CGPoint(x: x + 3, y: c.y + 6)); ctx.strokePath()
+            }
+        }
+        // four sensor blades radiating from the core (the open scanner)
+        let gap: CGFloat = 4, len: CGFloat = 12, halfW: CGFloat = 2.6
+        func blade(_ dx: CGFloat, _ dy: CGFloat) {
+            ctx.saveGState(); ctx.translateBy(x: c.x, y: c.y); ctx.rotate(by: atan2(dy, dx))
+            let r = CGRect(x: gap, y: -halfW, width: len, height: halfW * 2)
+            ctx.addPath(CGPath(roundedRect: r, cornerWidth: halfW, cornerHeight: halfW, transform: nil))
+            ctx.setFillColor(cyan); ctx.fillPath()
+            ctx.setFillColor(cyanHi); ctx.fillEllipse(in: CGRect(x: gap + len - 3, y: -1.6, width: 3.2, height: 3.2))
+            ctx.restoreGState()
+        }
+        blade(0, -1); blade(0, 1); blade(-1, 0); blade(1, 0)
+        // central housing + lit core
+        let h = CGRect(x: c.x - 5.5, y: c.y - 5.5, width: 11, height: 11)
+        ctx.addPath(CGPath(roundedRect: h, cornerWidth: 2.5, cornerHeight: 2.5, transform: nil))
+        ctx.setFillColor(dark); ctx.fillPath()
+        ctx.addPath(CGPath(roundedRect: h, cornerWidth: 2.5, cornerHeight: 2.5, transform: nil))
+        ctx.setStrokeColor(cyan); ctx.setLineWidth(1.4); ctx.strokePath()
+        ctx.setFillColor(cyanHi); ctx.fillEllipse(in: CGRect(x: c.x - 2, y: c.y - 2, width: 4, height: 4))
     }
 
     // The OP-1's four signature encoder knobs: blue / green / white / orange caps, each with a
@@ -1125,7 +1170,7 @@ final class DeviceView: NSView {
                     // power-on now (not while cycling themes). Only when the theme actually changed.
                     let themeChanged = theme.id != themeIDOnSettingsEnter
                     screen = .gauge; settingsPage = 0
-                    if themeChanged, theme.console != .none { startBoot(force: true) }
+                    if themeChanged, theme.console != .none || theme.odradek { startBoot(force: true) }
                 }
                 else if i == 1 { settingsPage = (settingsPage + 1) % settingsPageCount }   // cycle SETUP → REPORT → ADMIN
                 else { onPopout?() }
@@ -1153,7 +1198,7 @@ final class DeviceView: NSView {
                 }
             }
         } else if emblemRectDesign.contains(p) {  // click the bottom logo → replay the console power-on
-            if theme.console != .none { startBoot(force: true) }
+            if theme.console != .none || theme.odradek { startBoot(force: true) }
         }
     }
 }

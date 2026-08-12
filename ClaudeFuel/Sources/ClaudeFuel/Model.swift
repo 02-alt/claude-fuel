@@ -38,7 +38,7 @@ struct Plan {
 
 // MARK: - Theme
 
-enum Emblem { case none, ps2, xbox, op1, powerRing, pager }   // signature badge drawn on the body
+enum Emblem { case none, ps2, xbox, op1, powerRing, pager, odradek }   // signature badge drawn on the body
 enum ConsoleUI { case none, ps2, xbox }                       // console-authentic animated gauge screen
 
 struct Theme {
@@ -69,6 +69,7 @@ struct Theme {
     var reflective = false      // real reflective LCD: dark ink on a pale panel, recessed (no glow halo)
     var opStyle = false         // OP-1 "FX" screen: black OLED with multi-colour neon vector graphics
     var console: ConsoleUI = .none  // console-authentic animated gauge (PS2 Browser / Xbox blades)
+    var odradek = false             // Death Stranding "ODRADEK" screen: BB-pod fuel cell + chiral network
 
     // Black "beeper" body with a bright cool-white screen — matches the original ref.
     static let noir = Theme(
@@ -186,7 +187,22 @@ struct Theme {
         lcdGlow: hex(0xB8C79E), lcdAccent: hex(0x22271C), emblem: .pager, reflective: true
     )
 
-    static let all: [Theme] = [clarity, pager, noir, op1, ps2, xbox, xray, aqua, smoke]
+    // Death Stranding "ODRADEK" unit — matte-black carbon body, near-black emissive screen with a
+    // BB-pod fuel cell (amber fluid = session), a chiral-network status chip, and cargo-load bars.
+    // Amber is the weekly accent; drains into a red "BT proximity" alert.
+    static let odradek = Theme(
+        id: "odradek", name: "Odradek",
+        // near-black graphite, minimal, with a cool cyan hologram glow — the DS Cuff-Links palette
+        metalHi: hex(0x24272C), metal: hex(0x131519), metalLo: hex(0x070809), edge: hex(0x2C5866),
+        screwHi: hex(0x3A4750), screwLo: hex(0x0C0F12),
+        brand: hex(0x8CA6B4),
+        bezel: hex(0x080A0C), bezelInner: hex(0x000000),
+        btnHi: hex(0x1E2226), btnLo: hex(0x0E1114), btnGlyph: hex(0x9FC4D4),
+        lcdBG: hex(0x080B0F), lcdOn: hex(0xF2F5F7),
+        lcdGlow: hex(0x4FB6DE), lcdAccent: hex(0xF0A84B), emblem: .odradek, odradek: true
+    )
+
+    static let all: [Theme] = [clarity, pager, noir, op1, ps2, xbox, odradek, xray, aqua, smoke]
     static func by(id: String) -> Theme { all.first { $0.id == id } ?? noir }
 
     private static func hex(_ v: Int) -> NSColor {
