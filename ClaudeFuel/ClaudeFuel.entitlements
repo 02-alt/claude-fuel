@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Lets the refill notification use the Time-Sensitive interruption level so it breaks
+         through Focus / Do Not Disturb. Restricted entitlement: only honored when the signing
+         Developer ID is on a team whose App ID has "Time Sensitive Notifications" enabled and an
+         embedded Developer ID provisioning profile authorizes it (see notarize.sh header). -->
+    <key>com.apple.developer.usernotifications.time-sensitive</key>
+    <true/>
+</dict>
+</plist>

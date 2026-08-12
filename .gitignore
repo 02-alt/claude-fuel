@@ -1,0 +1,17 @@
+.DS_Store
+.claude/settings.local.json
+ClaudeFuel/Icon/AppIcon.iconset/
+ClaudeFuel/Icon/AppIcon.icns
+ClaudeFuel/ClaudeFuel.app/
+ClaudeFuel/.build/
+ClaudeFuel/TokenFuel.dmg
+ClaudeFuel/TokenFuel.zip
+ClaudeFuel/releases/
+ClaudeFuel/dmg_stage/
+
+# Sparkle
+sparkle_public_key.txt
+ClaudeFuel.zip
+
+# Icon working backups (not needed to build)
+ClaudeFuel/Icon/*.bak.png
