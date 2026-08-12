@@ -952,29 +952,29 @@ func drawGaugeLargeOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn:
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // ring dial with the % stacked inside — the whole stack spread evenly down the panel
-    let cx = 60, cy = 58, r = 40
+    // ring dial with the % stacked inside — sits high, then the stack flows down the panel
+    let cx = 60, cy = 48, r = 40
     ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
     if !low { orbit3D(lcd, cx: cx, cy: cy, r: r, phase: phase, path: dim, node: cyanHi) }
     lcdChevron(lcd, cx - r - 5, cy, left: true,  cyan)
     lcdChevron(lcd, cx + r + 5, cy, left: false, cyan)
-    lcdTextSpacedC(lcd, "SESSION", cx, 38, cyan, gap: 1)
-    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 50, low ? danger : white, 3)   // 50…71
+    lcdTextSpacedC(lcd, "SESSION", cx, 28, cyan, gap: 1)
+    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 40, low ? danger : white, 3)   // 40…61
 
     // reconnect countdown, centred below the ring
     let atClock = Store.shared.refillClockTime
-    lcdTextC(lcd, low ? "TIMEFALL" : (atClock ? "RECONNECT AT" : "RECONNECT IN"), cx, 104, low ? danger : dim)
+    lcdTextC(lcd, low ? "TIMEFALL" : (atClock ? "RECONNECT AT" : "RECONNECT IN"), cx, 94, low ? danger : dim)
     let refillVal = state.resetSeconds.map { atClock ? fmtClockTime($0) : fmtClock($0) } ?? "READY"
-    lcdTextC(lcd, refillVal, cx, 114, low ? danger : white, 2)  // 114…128
+    lcdTextC(lcd, refillVal, cx, 104, low ? danger : white, 2)  // 104…118
 
-    lcdLine(lcd, 10, 142, 109, 142, dim)
+    lcdLine(lcd, 10, 132, 109, 132, dim)
     if let wf = state.weekFraction {
         let wr = state.weekResetSeconds.map { fmtLong($0) } ?? ""
-        lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 148, amber)
+        lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 138, amber)
     } else {
-        lcdTextC(lcd, "PLAN \(state.plan)", 60, 148, dim)
+        lcdTextC(lcd, "PLAN \(state.plan)", 60, 138, dim)
     }
-    lcdTextC(lcd, "TAP TO EXIT", 60, 164, dim)
+    lcdTextC(lcd, "TAP TO EXIT", 60, 154, dim)
 }
 
 // MARK: - Screen: stats
