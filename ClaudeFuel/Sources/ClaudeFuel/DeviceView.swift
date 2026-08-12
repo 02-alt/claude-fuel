@@ -1177,6 +1177,10 @@ final class DeviceView: NSView {
             else if settingsPage == 2, Account.isOwner, let b = adminButtonAt(p) { reportPressed = b }
         }
         if pressed == nil, !compact, screen == .gauge, needsSignIn, signInButtonAt(p) { signInPressed = true }
+        // Odradek theme: a soft "inventory select" click when you press a button or the screen
+        if theme.odradek, pressed != nil || reportPressed != nil || signInPressed || lcdRectDesign.contains(p) {
+            SFX.play("odradek_click", volume: 0.3)
+        }
         needsDisplay = true
     }
     // The mini player has no title bar, so we move it ourselves: a real drag starts a window
