@@ -943,56 +943,39 @@ func drawGaugeLargeScreen(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: 
     lcdTextC(lcd, "TAP TO EXIT", 60, 155, dim)
 }
 
-// MARK: - Screen: large-print ODRADEK — the Death Stranding large layout (huge session %, a thick
-// amber fuel bar, the chiral-network chip, and the reconnect countdown). `phase` drives the sparks.
+// MARK: - Screen: large-print ODRADEK — a single giant ring dial (matching the hero screen) with a
+// huge session % inside, then a big legible reconnect countdown. `phase` drives the orbit node.
 func drawGaugeLargeOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn: Bool, phase: Double) {
-    let on = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor, amber = theme.lcdAccent.cgColor
-    let chiral = opColor(0xBFE9FF), danger = opColor(0xE5484D)
+    let white = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor
+    let cyan = opColor(0x5FB6DE), cyanHi = opColor(0xBFE9FF)
+    let amber = theme.lcdAccent.cgColor, danger = opColor(0xE5484D)
     let sf = max(0, min(1, state.fraction))
     let low = state.low
-    let fuel = low ? danger : amber
+    let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // a few chiral sparks drifting up
-    let span = Double(lcd.H)
-    for i in 0..<8 {
-        let sx = 8 + (i * 79) % (lcd.W - 16)
-        let up = (phase * (8 + Double(i)) + Double(i) * 41).truncatingRemainder(dividingBy: span)
-        lcd.px(sx, lcd.H - 1 - Int(up), opColor(0xBFE9FF, 0.28))
-    }
+    // giant ring dial with the huge % stacked inside
+    let cx = 60, cy = 60, r = 44
+    ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
+    if !low { orbit3D(lcd, cx: cx, cy: cy, r: r, phase: phase, path: dim, node: cyanHi) }
+    lcdChevron(lcd, cx - r - 5, cy, left: true,  cyan)
+    lcdChevron(lcd, cx + r + 5, cy, left: false, cyan)
+    lcdTextSpacedC(lcd, "SESSION", cx, 36, cyan, gap: 1)
+    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", cx, 48, low ? danger : white, 4)   // huge, 48…76
 
-    lcdTextC(lcd, "SESSION", 60, 6, dim)
-    lcdTextC(lcd, "\(Int((sf*100).rounded()))%", 60, 16, fuel, 4)      // huge session %, 16…44
-
-    // thick fuel bar
-    let bx = 12, by = 54, bw = 96, bh = 18, segs = 12
-    for x in bx...(bx+bw) { lcd.px(x, by, chiral); lcd.px(x, by+bh, chiral) }
-    for y in by...(by+bh) { lcd.px(bx, y, chiral); lcd.px(bx+bw, y, chiral) }
-    if !(low && !blinkOn) {
-        let lit = Int((sf * Double(segs)).rounded())
-        let innerL = bx + 2, innerR = bx + bw - 1
-        let cell = Double(innerR - innerL) / Double(segs)
-        for i in 0..<segs where i < lit {
-            let x0 = innerL + Int((Double(i)   * cell).rounded())
-            let x1 = innerL + Int((Double(i+1) * cell).rounded())
-            lcd.rectFill(x0, by+2, max(1, x1 - x0 - 2), bh-3, fuel)
-        }
-    }
-
-    lcdTextC(lcd, low ? "SIGNAL LOST" : "CONNECTED", 60, 76, low ? danger : chiral)
-
+    // big legible reconnect countdown below the ring
     let atClock = Store.shared.refillClockTime
-    lcdTextC(lcd, low ? "TIMEFALL" : (atClock ? "RECONNECT AT" : "RECONNECT IN"), 60, 91, dim)
+    lcdTextC(lcd, low ? "TIMEFALL" : (atClock ? "RECONNECT AT" : "RECONNECT IN"), cx, 112, low ? danger : dim)
     let refillVal = state.resetSeconds.map { atClock ? fmtClockTime($0) : fmtClock($0) } ?? "READY"
-    lcdTextC(lcd, refillVal, 60, 103, on, 2)  // 103…117
+    lcdTextC(lcd, refillVal, cx, 122, low ? danger : white, 2)  // 122…136
 
-    lcdLine(lcd, 10, 126, 109, 126, dim)
+    lcdLine(lcd, 10, 148, 109, 148, dim)
     if let wf = state.weekFraction {
         let wr = state.weekResetSeconds.map { fmtLong($0) } ?? ""
-        lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 132, amber)
+        lcdTextC(lcd, "WEEK \(Int((wf*100).rounded()))%  \(wr)", 60, 154, amber)
     } else {
-        lcdTextC(lcd, "PLAN \(state.plan)", 60, 132, dim)
+        lcdTextC(lcd, "PLAN \(state.plan)", 60, 154, dim)
     }
-    lcdTextC(lcd, "TAP TO EXIT", 60, 155, dim)
+    lcdTextC(lcd, "TAP TO EXIT", 60, 166, dim)
 }
 
 // MARK: - Screen: stats

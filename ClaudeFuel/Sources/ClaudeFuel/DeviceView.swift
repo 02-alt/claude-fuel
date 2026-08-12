@@ -62,7 +62,8 @@ final class DeviceView: NSView {
     private var bootStart: CFTimeInterval = 0            // console power-on anim start (0 = idle)
     private var bootSeam = false                         // Odradek: this boot rolled the rare Seam intro
     // Each console's boot matches its startup clip: ps2_startup (9.0s) vs the trimmed xbox_startup (7.3s).
-    private var bootDuration: CFTimeInterval { theme.console == .xbox ? 7.3 : theme.odradek ? 3.9 : 9.0 }
+    // Odradek: the scanner boot syncs to its ~2.4s chime; the rare Seam repatriation runs longer.
+    private var bootDuration: CFTimeInterval { theme.console == .xbox ? 7.3 : theme.odradek ? (bootSeam ? 3.9 : 2.4) : 9.0 }
     private let bootFadeIn: CFTimeInterval = 1.2      // after the boot resolves to black, fade the LCD UI up
     private var bootTotal: CFTimeInterval { bootDuration + bootFadeIn }
     private var bootActive: Bool { bootStart > 0 }
