@@ -889,8 +889,8 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // holographic frame: sparse crosses + dashes tucked against the border, faint
-    chiralField(lcd, color: opColor(0x5FB6DE, 0.3))
+    // holographic frame: sparse crosses + dashes tucked against the border, very faint
+    chiralField(lcd, color: opColor(0x5FB6DE, 0.1))
 
     lcdTextSpacedC(lcd, "ODRADEK", 60, 4, white, gap: 3)
 
