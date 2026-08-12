@@ -819,9 +819,12 @@ func lcdChevron(_ lcd: LCD, _ x: Int, _ cy: Int, left: Bool, _ c: CGColor) {
 // filling clockwise from 12 o'clock to `frac`. The DS "SND globe / item HUD" motif.
 func ringGauge(_ lcd: LCD, cx: Int, cy: Int, r: Int, frac: Double, ring: CGColor, fill: CGColor, dim: CGColor) {
     let f = max(0, min(1, frac)), R = Double(r)
+    // full base ring (dense, in the structural colour) so the circle always reads as a centred
+    // whole — the bright arc below is just the fill accent on top of it.
     var d = 0.0
     while d < 360 { let a = d * .pi/180
-        lcd.px(cx + Int((cos(a)*R).rounded()), cy + Int((sin(a)*R).rounded()), dim); d += 8 }
+        lcd.px(cx + Int((cos(a)*R).rounded()), cy + Int((sin(a)*R).rounded()), ring); d += 6 }
+    _ = dim
     for deg in stride(from: 0.0, to: 360.0, by: 30.0) {
         let a = deg * .pi/180, long = deg.truncatingRemainder(dividingBy: 90) == 0
         let r0 = R - (long ? 5 : 3)
