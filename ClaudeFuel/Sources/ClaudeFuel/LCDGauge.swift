@@ -892,6 +892,19 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
+    // occasional bubbles drifting up in the back — a few staggered slots on long cycles, so only
+    // one or two are ever visible at a time. Fade in and out over each rise. Drawn first (behind).
+    for i in 0..<5 {
+        let period = 9.0 + Double(i) * 3.7
+        let local = (phase + Double(i) * 5.3).truncatingRemainder(dividingBy: period)
+        guard local < 4.0 else { continue }
+        let p = local / 4.0                                   // 0…1 rise progress
+        let by = Double(lcd.H - 6) - p * Double(lcd.H - 22)
+        let bx = 12 + (i * 27) % (lcd.W - 24) + Int(3 * sin(local * 1.6 + Double(i)))
+        let a = sin(p * .pi) * 0.32
+        if a > 0.03 { lcd.px(bx, Int(by), opColor(0xBFE9FF, CGFloat(a))) }
+    }
+
     // session ring dial — the hero, centred in the space above the RECONNECT line.
     let cx = 60, cy = 60, r = 44
     ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
