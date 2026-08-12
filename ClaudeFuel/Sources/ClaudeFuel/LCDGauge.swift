@@ -889,9 +889,6 @@ func drawGaugeScreenOdradek(_ lcd: LCD, state: GaugeState, theme: Theme, blinkOn
     let low = state.low
     let ringC = low ? danger : cyan, arcC = low ? danger : cyanHi
 
-    // holographic frame: sparse crosses + dashes tucked against the border, very faint
-    chiralField(lcd, color: opColor(0x5FB6DE, 0.1))
-
     // session ring dial — the hero, centred in the space above the RECONNECT line.
     let cx = 60, cy = 60, r = 44
     ringGauge(lcd, cx: cx, cy: cy, r: r, frac: (low && !blinkOn) ? 0 : sf, ring: ringC, fill: arcC, dim: dim)
