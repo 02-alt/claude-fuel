@@ -422,7 +422,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         if let b = statusItem.button {
             if refuelTimer == nil {                             // don't stomp the flourish (icon + text)
                 b.image = Self.statusIcon(fraction: st.fraction)
-                setStatusTitle(Self.percentReadout(st), alpha: 1)   // same setter as the flourish → no colour pop
+                // Don't resize the menu-bar text while the popover is open: the status item is
+                // variable-length, so a width change (e.g. the 0% "↻countdown" ticking each second)
+                // resizes the button and drags the anchored popover sideways. Freeze the readout
+                // until it closes; the fixed-size icon still updates.
+                if !popover.isShown { setStatusTitle(Self.percentReadout(st), alpha: 1) }
             }
             b.setAccessibilityLabel("Claude Token Fuel")
             b.setAccessibilityValue(Self.a11yReadout(st))
