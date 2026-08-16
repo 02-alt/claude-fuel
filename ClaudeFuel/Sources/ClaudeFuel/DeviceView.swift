@@ -382,6 +382,11 @@ final class DeviceView: NSView {
                     else { drawPS2Boot(lcd, theme: theme, elapsed: e, duration: bootDuration) }
                 }
             }
+            // Weekly tokens exhausted (live, no credits to extend): a lockout screen with a big
+            // countdown to the next weekly refill, overriding the normal gauge / large-print.
+            else if let wf = s.weekFraction, wf <= 0.0005, s.weekResetSeconds != nil {
+                drawWeeklyLimitScreen(lcd, state: s, theme: theme)
+            }
             else if Store.shared.largePrint, theme.odradek { drawGaugeLargeOdradek(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }
             else if Store.shared.largePrint { drawGaugeLargeScreen(lcd, state: s, theme: theme, blinkOn: blinkOn) }
             else if theme.console == .ps2 { drawGaugeScreenPS2(lcd, state: s, theme: theme, blinkOn: blinkOn, phase: phase) }

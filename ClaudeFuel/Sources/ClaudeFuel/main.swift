@@ -26,6 +26,11 @@ func renderPreview(_ args: [String]) {
         state.weekFraction = 0.96
         state.weekResetSeconds = 3*24*3600 + 6*3600
     }
+    if args.contains("--weeklimit") {                 // preview the weekly-limit lockout screen
+        state.live = true
+        state.weekFraction = 0
+        state.weekResetSeconds = 2*24*3600 + 15*3600
+    }
 
     let dev = DeviceView(frame: .zero)
     dev.compact = compact

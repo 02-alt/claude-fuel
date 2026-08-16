@@ -1170,6 +1170,28 @@ enum SignInUI {
 
 // Shown on the main screen when no Claude login is recognized on this Mac. Lets the user connect
 // their account from inside the app (opens the browser) instead of running `/login` in a terminal.
+// MARK: - Screen: weekly limit reached — weekly tokens exhausted (and no credits to extend). Explains
+// the lockout and shows a big countdown/clock to the next weekly refill (IN vs AT per the setting).
+func drawWeeklyLimitScreen(_ lcd: LCD, state: GaugeState, theme: Theme) {
+    let on = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor, acc = theme.lcdAccent.cgColor
+
+    lcdTextC(lcd, "WEEKLY LIMIT", 60, 8, acc)
+    lcdLine(lcd, 8, 20, 111, 20, dim)
+
+    lcdTextC(lcd, "WEEKLY TOKENS SPENT", 60, 30, on)
+    lcdTextC(lcd, "ADD CREDITS OR WAIT", 60, 44, dim)
+
+    // big timer to the next weekly refill — countdown ("IN") or wall-clock ("AT") per the setting
+    let atClock = Store.shared.refillClockTime
+    lcdTextC(lcd, atClock ? "REFILL AT" : "REFILL IN", 60, 70, dim)
+    let val = state.weekResetSeconds.map { atClock ? fmtClockTime($0) : fmtLong($0) } ?? "--"
+    let scale = PF.width(val, 3) <= 116 ? 3 : 2      // shrink if a long "AT" string would overflow
+    lcdTextC(lcd, val, 60, 82, acc, scale)
+
+    lcdLine(lcd, 8, 128, 111, 128, dim)
+    lcdTextC(lcd, "USAGE RESUMES THEN", 60, 136, dim)
+}
+
 func drawSignInScreen(_ lcd: LCD, theme: Theme, pressed: Bool) {
     let on = theme.lcdOn.cgColor, dim = theme.lcdDimText.cgColor, bg = theme.lcdBG.cgColor
     lcdTextC(lcd, "TOKEN FUEL", 60, 6, on)
